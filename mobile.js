@@ -33,45 +33,62 @@
   ['bGo'].forEach(id => $(id).addEventListener('click', goLandscape, true));
   document.addEventListener('click', e => { if (e.target.closest && e.target.closest('#mCont,#wGo,#wCalm')) goLandscape(); }, true);
 
-  /* ---- 떠다니는 조이스틱 ---- */
-  const zone = document.createElement('div'); zone.id = 'tzone'; $('touch').prepend(zone);
-  const st = $('stick'), knob = st.querySelector('i');
-  st.style.pointerEvents = 'none';
-  const home = () => { st.classList.remove('live'); st.style.left = ''; st.style.top = ''; st.style.bottom = ''; knob.style.transform = ''; };
-  let pid = null, cx = 0, cy = 0;
-  const R = 52;
-  function move(e) {
+  /* ---- 좀비고 스타일 고정 방향 패드 ---- */
+  $('stick').style.display = 'none';
+  const pad = document.createElement('div'); pad.id = 'dpad';
+  const ARW = 'M0 -9 L8 4 L-8 4 Z';
+  pad.innerHTML = `<svg viewBox="-100 -100 200 200" aria-hidden="true">
+    <circle r="96" class="ring"/><circle r="84" class="base"/>
+    ${['up', 'right', 'down', 'left'].map((d, i) => `<g class="w w-${d}" transform="rotate(${i * 90})"><path d="M-27 -30 Q-27 -78 0 -80 Q27 -78 27 -30 L0 -6 Z" class="wb"/><path d="${ARW}" class="ar" transform="translate(0 -52)"/></g>`).join('')}
+    <circle r="22" class="hub"/><circle r="9" class="dot"/></svg>`;
+  $('touch').appendChild(pad);
+  const ws = ['up', 'right', 'down', 'left'].map(d => pad.querySelector('.w-' + d));
+  let pid = null;
+  function padMove(e) {
+    const r = pad.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width * .42;
     let dx = e.clientX - cx, dy = e.clientY - cy; const l = Math.hypot(dx, dy);
-    if (l > R) { dx *= R / l; dy *= R / l; }
-    T.x = dx / R; T.y = dy / R; T.active = Math.hypot(T.x, T.y) > .12;
-    // 끝까지 밀면 자동으로 달리기 (달리기 버튼을 켜 두지 않았을 때)
-    T.autoRun = l > R * 1.45;
-    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    if (l < R * .14) { T.active = false; T.x = T.y = 0; ws.forEach(w => w.classList.remove('on')); pad.querySelector('.dot').setAttribute('transform', ''); return; }
+    const k = Math.min(1, l / R); T.x = dx / l * k; T.y = dy / l * k; T.active = true;
+    T.autoRun = l > R * 1.25;                                   // 패드 바깥까지 밀면 달리기
+    const a = Math.atan2(dy, dx), deg = (a * 180 / Math.PI + 450) % 360;   // 0 = 위
+    ws.forEach((w, i) => { const c = i * 90, dd = Math.abs(((deg - c + 540) % 360) - 180); w.classList.toggle('on', dd < 58); });
+    const m = Math.min(l, R * .55); pad.querySelector('.dot').setAttribute('transform', `translate(${dx / l * m / r.width * 200} ${dy / l * m / r.width * 200})`);
   }
-  zone.addEventListener('pointerdown', e => {
-    if (pid !== null || S.mode === 'runner') return;
-    pid = e.pointerId; zone.setPointerCapture(pid);
-    cx = e.clientX; cy = e.clientY;
-    st.classList.add('live'); st.style.left = (cx - st.offsetWidth / 2) + 'px'; st.style.top = (cy - st.offsetHeight / 2) + 'px'; st.style.bottom = 'auto';
-    T.active = false; T.x = T.y = 0;
-    if (advanceWaiters.length) pressAdvance();     // 대사 넘기기도 된다
+  pad.addEventListener('pointerdown', e => {
+    if (pid !== null) return; pid = e.pointerId; pad.setPointerCapture(pid); pad.classList.add('live'); padMove(e);
+    if (advanceWaiters.length) pressAdvance();
   });
-  zone.addEventListener('pointermove', e => { if (e.pointerId === pid) move(e); });
-  const end = e => { if (e.pointerId !== pid) return; pid = null; T.active = false; T.x = T.y = 0; T.autoRun = false; home(); };
-  zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
+  pad.addEventListener('pointermove', e => { if (e.pointerId === pid) padMove(e); });
+  const padEnd = e => { if (e.pointerId !== pid) return; pid = null; pad.classList.remove('live'); T.active = false; T.x = T.y = 0; T.autoRun = false; ws.forEach(w => w.classList.remove('on')); pad.querySelector('.dot').setAttribute('transform', ''); };
+  pad.addEventListener('pointerup', padEnd); pad.addEventListener('pointercancel', padEnd);
+  // 왼쪽 빈 화면을 톡 치면 대사 넘기기
+  const zone = document.createElement('div'); zone.id = 'tzone'; $('touch').prepend(zone);
+  zone.addEventListener('pointerdown', () => { if (advanceWaiters.length) pressAdvance(); });
+
+  /* ---- 오른쪽 둥근 버튼 (빨간 테두리) + 가방 ---- */
+  const bag = document.createElement('button'); bag.id = 'tBag'; bag.setAttribute('aria-label', '가방');
+  $('tbtns').appendChild(bag);
+  bag.addEventListener('pointerdown', e => { e.preventDefault(); toggleBag(); });
+  for (const b of ['tE', 'tRun', 'tF', 'tBag']) {
+    const el = $(b);
+    el.addEventListener('pointerdown', () => { el.classList.add('down'); if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) { } });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => el.classList.remove('down')));
+  }
 
   /* ---- 키보드 안내 대신 터치 안내 ---- */
   const _hint = hint;
   hint = function (html, ms) {
-    if (/WASD/.test(html)) html = '왼쪽 화면을 끌어서 <b>이동</b> · 끝까지 밀면 <b>달리기</b><br>오른쪽 <b>조사</b> 버튼 · 숨은 채로 <b>길게</b> 누르면 숨 참기';
+    if (/WASD/.test(html)) html = '왼쪽 <b>방향 패드</b>로 이동 · 바깥까지 밀면 <b>달리기</b><br>오른쪽 <b>손</b> 버튼으로 조사 · 숨은 채로 <b>길게</b> 누르면 숨 참기';
     html = html.replace(/<kbd>E<\/kbd>/g, '<b>조사</b> 버튼').replace(/<kbd>F<\/kbd>/g, '<b>손전등</b> 버튼').replace(/<kbd>Shift<\/kbd>/g, '<b>달리기</b>');
     return _hint(html, ms);
   };
 
   /* ---- 버튼 모양 · 마지막 추격 ---- */
-  $('tE').innerHTML = '<img src="img/ui/c_hand_reach.webp" alt=""><span>조사</span>';
-  $('tRun').innerHTML = '<img src="img/ui/c_key_shift.webp" alt=""><span>달리기</span>';
-  $('tF').innerHTML = '<img src="img/ui/c_flashlight_on.webp" alt=""><span>손전등</span>';
+  const face = (ic, t) => `<i><img src="img/ui/${ic}.webp" alt=""></i><span>${t}</span>`;
+  $('tE').innerHTML = face('p_hand', '조사');
+  $('tRun').innerHTML = face('p_door_open', '달리기');
+  $('tF').innerHTML = face('p_flashlight', '손전등');
+  bag.innerHTML = face('p_bag', '가방');
   let lastMode = '';
   setInterval(() => {
     const m = S.mode === 'runner' ? 'runner' : 'play';
@@ -81,12 +98,16 @@
         const lab = P.hidden ? (breathPrompt() ? '숨 참기' : '나오기') : ($('prompt').classList.contains('hidden') ? '조사' : ($('pText').textContent || '조사').replace(/^숨기 · .*/, '숨기'));
         const sp = $('tE').querySelector('span'); if (sp.textContent !== lab) sp.textContent = lab.length > 6 ? lab.slice(0, 6) + '…' : lab;
         $('tE').classList.toggle('hot', !$('prompt').classList.contains('hidden') || !!P.hidden);
+        const want = P.hidden || /^숨기/.test(lab) ? 'p_locker_eyes' : 'p_hand', im = $('tE').querySelector('img');
+        if (!im.src.endsWith(want + '.webp')) im.src = `img/ui/${want}.webp`;
+        $('tF').classList.toggle('on', !!S.torch);
       }
       return;
     }
     lastMode = m;
     document.body.classList.toggle('t-runner', m === 'runner');
     $('tE').querySelector('span').textContent = m === 'runner' ? '점프' : '조사';
+    $('tE').querySelector('img').src = m === 'runner' ? 'img/ui/p_arrow_next.webp' : 'img/ui/p_hand.webp';
   }, 150);
   // 달리기 버튼 상태 표시
   $('tRun').addEventListener('pointerdown', () => setTimeout(() => $('tRun').classList.toggle('on', !!T.run), 0));

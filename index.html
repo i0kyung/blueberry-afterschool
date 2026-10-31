@@ -524,6 +524,47 @@ body.touch.t-runner #tE{width:96px!important;height:96px!important}
   #chap h2{font-size:30px}
   #mini .k{width:52px;height:52px}
 }
+
+/* ===== 좀비고 스타일 컨트롤러 (휴대폰) ===== */
+body.touch #stick,body.touch #prompt{display:none!important}
+body.touch #tzone{width:42%;top:170px}
+#dpad{position:absolute;left:calc(22px + env(safe-area-inset-left));bottom:calc(18px + env(safe-area-inset-bottom));width:min(150px,34vh);aspect-ratio:1;pointer-events:auto;touch-action:none;display:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+body.touch #dpad{display:block}
+#dpad svg{width:100%;height:100%;overflow:visible}
+#dpad .ring{fill:rgba(20,26,48,.28);stroke:rgba(255,255,255,.28);stroke-width:3}
+#dpad .base{fill:rgba(255,255,255,.07)}
+#dpad .wb{fill:rgba(225,230,245,.55);stroke:rgba(40,44,70,.35);stroke-width:2;transition:fill .08s}
+#dpad .ar{fill:rgba(60,64,96,.75);transition:fill .08s}
+#dpad .w.on .wb{fill:#ef3a50;stroke:#fff;stroke-width:2.5}
+#dpad .w.on .ar{fill:#fff}
+#dpad .hub{fill:rgba(235,238,250,.75);stroke:rgba(40,44,70,.3);stroke-width:2}
+#dpad .dot{fill:rgba(90,96,140,.55)}
+#dpad.live .ring{fill:rgba(20,26,48,.4)}
+body.touch #tbtns{right:calc(18px + env(safe-area-inset-right));bottom:calc(16px + env(safe-area-inset-bottom));display:block;width:210px;height:190px}
+body.touch #tbtns button{position:absolute;display:block;padding:0;border:0;background:none;width:auto;height:auto;font:inherit;backdrop-filter:none;-webkit-tap-highlight-color:transparent}
+body.touch #tbtns button i{display:grid;place-items:center;width:62px;height:62px;border-radius:50%;
+  background:radial-gradient(circle at 50% 38%,#fff 0%,#f4f2fb 55%,#d9d6e8 100%);border:5px solid #e5304a;box-shadow:0 0 0 2px rgba(255,255,255,.85),0 5px 12px rgba(0,0,0,.55),inset 0 -4px 0 rgba(0,0,0,.08);transition:transform .08s}
+body.touch #tbtns button img{width:62%;height:62%;object-fit:contain;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+body.touch #tbtns button span{position:absolute;left:50%;top:100%;transform:translate(-50%,2px);white-space:nowrap;font:800 10.5px Pretendard;color:#fff;text-shadow:0 1px 0 #000,0 0 4px #000,0 0 2px #000;letter-spacing:.02em}
+body.touch #tbtns button.down i{transform:scale(.9);box-shadow:0 0 0 2px #fff,0 2px 6px rgba(0,0,0,.6)}
+body.touch #tE{right:6px;bottom:22px}
+body.touch #tE i{width:84px!important;height:84px!important;border-width:6px!important}
+body.touch #tE.hot i{border-color:#ff2d55;animation:hotp 1s ease-in-out infinite}
+@keyframes hotp{50%{box-shadow:0 0 0 2px #fff,0 0 0 9px rgba(255,45,85,.35),0 5px 12px rgba(0,0,0,.55)}}
+body.touch #tRun{right:104px;bottom:12px}
+body.touch #tF{right:92px;bottom:96px}
+body.touch #tBag{right:14px;bottom:126px}
+body.touch #tBag i{width:54px;height:54px;border-width:4px}
+body.touch #tRun.on i,body.touch #tF.on i{background:radial-gradient(circle at 50% 38%,#fff6c8,#ffd76a 70%,#e8b23a);border-color:#ff3b4a}
+body.touch #bagBtn{display:none!important}
+body.touch #phone{left:calc(16px + env(safe-area-inset-left));top:66px;bottom:auto;width:112px;padding:7px 10px}
+body.touch #phone .time{font-size:19px}
+body.touch #goal{left:50%!important;right:auto;top:12px!important;bottom:auto!important;transform:translateX(-50%);max-width:46vw!important;font-size:12px}
+body.touch #goal.new{animation:none}
+body.touch #hint{top:56px}
+body.touch #say{bottom:calc(10px + env(safe-area-inset-bottom));max-width:min(560px,52vw)}
+body.t-runner #dpad,body.t-runner #tBag{display:none!important}
+body.touch.t-runner #tE i{width:100px!important;height:100px!important}
 </style>
 </head>
 <body>
