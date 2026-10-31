@@ -100,7 +100,8 @@ const HORROR = (() => {
     // 숨으면 먹먹하게
     if (A.lp) A.lp.frequency.setTargetAtTime(P.hidden ? 1100 : 20000, A.t(), .15);
     // 손전등 흔들림(걸음)
-    H.sway = P.moving ? Math.sin(P.bob * .5) * (P.run ? .07 : .035) : Math.sin(S.t * 1.3) * .012;
+    // 손전등은 걸음마다 흔들지 않는다 (화면 전체가 흔들려 보여서). 서 있을 때만 아주 느리게 미세하게.
+    H.sway = !P.moving && (typeof SET === 'undefined' || SET.shake) ? Math.sin(S.t * .8) * .006 : 0;
     // 디렉터: 첫 숨기 이벤트(교무실) 이후부터만. 프롤로그는 '혼자 남겨진 학교'로 둔다
     if (H.ev) { H.ev.t += dt; if (H.ev.t > H.ev.dur) H.ev = null; }
     if (fl.hide1 && !fl.ending && !fl.finale) {
@@ -145,8 +146,8 @@ const HORROR = (() => {
       const rate = danger ? 7.5 : 2.2, amp = danger ? .02 : .011;
       if (still) { const b = Math.sin(S.t * rate); return { sx: 1 - b * amp * .5, sy: 1 + b * amp, rot: 0, dx: danger ? rnd(-.25, .25) : 0 }; }
       const lean = P.run ? (dir === 'left' ? -.07 : dir === 'right' ? .07 : 0) : 0;
-      const s = Math.sin(bob * 2) * (P.run ? .035 : .02);
-      return { sx: 1 + s * .6, sy: 1 - s, rot: lean + Math.sin(bob) * (P.run ? .03 : .018), dx: 0 };
+      const s = Math.sin(bob * 2) * (P.run ? .02 : .012);
+      return { sx: 1 + s * .5, sy: 1 - s, rot: lean * .6 + Math.sin(bob) * (P.run ? .012 : .006), dx: 0 };
     }
     if (pre === 'm_') {
       const hunt = ['chase', 'pursue', 'search'].includes(M.state);
