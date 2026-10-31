@@ -231,9 +231,11 @@ const A = {
     const n = C.createBufferSource(); n.buffer = this.noise; n.loop = true; const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220; const ng = C.createGain(); ng.gain.value = .5;
     n.connect(lp).connect(ng).connect(this.bus.drone); n.start();
     // 형광등 험
-    const h = C.createOscillator(); h.type = 'sawtooth'; h.frequency.value = 120; const hf = C.createBiquadFilter(); hf.type = 'bandpass'; hf.frequency.value = 240; hf.Q.value = 4;
-    const h2 = C.createOscillator(); h2.type = 'square'; h2.frequency.value = 7.3; const h2g = C.createGain(); h2g.gain.value = .25;
-    const hg = C.createGain(); hg.gain.value = .5; h2.connect(h2g).connect(hg.gain); h.connect(hf).connect(hg).connect(this.bus.hum); h.start(); h2.start();
+    // (지지직거리지 않게: 사인 120Hz + 살짝 섞은 배음, 0.2Hz로 아주 느리게 숨쉬듯)
+    const h = C.createOscillator(); h.type = 'sine'; h.frequency.value = 120; const hb = C.createOscillator(); hb.type = 'triangle'; hb.frequency.value = 240;
+    const hbg = C.createGain(); hbg.gain.value = .12; const hf = C.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 600;
+    const h2 = C.createOscillator(); h2.type = 'sine'; h2.frequency.value = .2; const h2g = C.createGain(); h2g.gain.value = .08;
+    const hg = C.createGain(); hg.gain.value = .35; h2.connect(h2g).connect(hg.gain); h.connect(hf); hb.connect(hbg).connect(hf); hf.connect(hg).connect(this.bus.hum); h.start(); hb.start(); h2.start();
     // 추격 루프: 낮은 맥동 + 긴장 현
     const c1 = C.createOscillator(); c1.type = 'sawtooth'; c1.frequency.value = 110; const c2 = C.createOscillator(); c2.type = 'sawtooth'; c2.frequency.value = 116.5;
     const cf = C.createBiquadFilter(); cf.type = 'lowpass'; cf.frequency.value = 700; const cg = C.createGain(); cg.gain.value = .18;
@@ -565,6 +567,13 @@ async function run(fn, keepControl) {
    ========================================================= */
 const CORR_X = [105, 255, 405, 555, 705, 855, 1005, 1155, 1305];
 function setLights(list) { S.lights = list; }
+/* 깜빡임: 평소엔 켜져 있다가, 가끔(초당 rate번 꼴) 0.3~0.5초짜리 '깜-빡-깜빡'을 한 번 */
+const BLINK_PAT = [[0, 1, .15, 1], [.2, 1, 0, .7, 1], [0, .5, 1]];
+function blink(o, rate) {
+  if (o.bk) { if (S.t >= o.bk.t0 && S.t < o.bk.end) { const v = o.bk.p[Math.max(0, Math.min(o.bk.p.length - 1, Math.floor((S.t - o.bk.t0) / .075)))]; return v == null ? 1 : v; } o.bk = null; }
+  if (Math.random() < rate / 60) { const p = BLINK_PAT[(Math.random() * BLINK_PAT.length) | 0]; o.bk = { t0: S.t, end: S.t + p.length * .075, p }; }
+  return 1;
+}
 function corridorLights(on, flick) { return CORR_X.map(x => ({ x, y: 452, r: 125, on, flick: flick || 0, a: 1 })); }
 function floorLights(f) {
   const fl = S.flags;
@@ -949,7 +958,7 @@ function directorUpdate(dt) {
   if (hv > .1 && A.t() - A.lastHeart > 60 / (70 + hv * 80)) { A.lastHeart = A.t(); A.heart(); }
   // 험/드론
   const lit = S.lights.some(l => l.on);
-  A.setBus('hum', lit ? (f === 4 ? .05 : .025) : 0, .5);
+  A.setBus('hum', lit ? (f === 4 ? .035 : .018) : 0, .8);
   A.setBus('drone', f === 4 ? .32 : .18, 1);
   // 1층 첫 추격 종료 감지
   if (fl.chase1 && !fl.chase1Done && M.on && M.state === 'patrol' && M.stateT > .2) {
@@ -1071,8 +1080,9 @@ function render(dt) {
   ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
   if (S.chaseLevel > .05) { const rg = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .35, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .7); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(200,10,30,${S.chaseLevel * .35})`); ctx.fillStyle = rg; ctx.fillRect(0, 0, cv.width, cv.height); }
   // 필름 그레인
-  ctx.globalAlpha = typeof SET === 'undefined' || SET.grain ? .07 : 0; ctx.globalCompositeOperation = 'overlay';
-  const pat = ctx.createPattern(grain, 'repeat'); ctx.translate(rnd(0, 256), rnd(0, 256)); ctx.fillStyle = pat; ctx.fillRect(-256, -256, cv.width + 512, cv.height + 512);
+  ctx.globalAlpha = typeof SET === 'undefined' || SET.grain ? .035 : 0; ctx.globalCompositeOperation = 'overlay';
+  if (!render.gT || S.t - render.gT > 1 / 12 || S.t < render.gT) { render.gT = S.t; render.gO = [rnd(0, 256), rnd(0, 256)]; }
+  const pat = ctx.createPattern(grain, 'repeat'); ctx.translate(render.gO[0], render.gO[1]); ctx.fillStyle = pat; ctx.fillRect(-256, -256, cv.width + 512, cv.height + 512);
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   drawGlintsTop();
   // 숨기 틈 시야
@@ -1130,7 +1140,7 @@ function drawDarkness() {
   // 천장 조명 (벽에 가려짐, 한 번 계산 후 캐시)
   for (const l of S.lights) {
     if (!l.on || (window.HORROR && HORROR.isLightOff(l))) continue;
-    if (l.flick && Math.random() < l.flick * .25) l.a = Math.random() < .5 ? 0 : .4; else l.a = lerp(l.a == null ? 1 : l.a, 1, .2);
+    l.a = l.flick ? blink(l, l.flick * 1.4) : 1;
     if (l.a <= .05) continue;
     if (!l.poly || l.polyF !== f) { l.poly = castPoly(f, l.x, l.y, 0, Math.PI * 2, 72, l.r * 1.12); l.polyF = f; }
     fillPoly(d, l.x, l.y, l.poly, l.r * 1.12, .9 * l.a);
@@ -1141,7 +1151,7 @@ function drawDarkness() {
   fillPoly(d, px, py, castPoly(f, px, py, 0, Math.PI * 2, 56, amb), amb, P.hidden ? .62 : .82);
   // 손전등 (부채꼴, 벽에서 멈춤)
   if (S.torch && !P.hidden && S.mode === 'play') {
-    const flick = (S.battery < 10 && Math.random() < .08 ? .3 : 1) * (window.HORROR ? HORROR.torchK() : 1), len = 290, spread = .5;
+    const flick = (S.battery < 10 ? .3 + .7 * blink(S, .35) : 1) * (window.HORROR ? HORROR.torchK() : 1), len = 290, spread = .5;
     const ox = P.x, oy = P.y - 12, ta = P.ang + (window.HORROR ? HORROR.sway : 0);
     fillPoly(d, ox, oy, castPoly(f, ox, oy, ta - spread, ta + spread, 64, len), len, .95 * flick, .6, true);
   }
@@ -1974,7 +1984,7 @@ function startTitleFx() {
   };
   dustRaf = requestAnimationFrame(tick);
   const glitch = () => {
-    const t = $('title'); t.classList.add('glitch'); if (A.ctx) A.noiseHit(.12, 3000, 1200, .12);
+    const t = $('title'); t.classList.add('glitch'); if (A.ctx) A.noiseHit(.04, 2200, 1200, .08);
     setTimeout(() => t.classList.remove('glitch'), 120 + Math.random() * 90);
     glitchT = setTimeout(glitch, 6000 + Math.random() * 7000);
   };

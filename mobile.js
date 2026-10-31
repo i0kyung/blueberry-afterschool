@@ -84,9 +84,9 @@
   };
 
   /* ---- 버튼 모양 · 마지막 추격 ---- */
-  const face = (ic, t) => `<i><img src="img/ui/${ic}.webp" alt=""></i><span>${t}</span>`;
+  const face = (ic, t) => `<i><img src="img/ui/${ic.includes('.') ? ic : ic + '.webp'}" alt=""></i><span>${t}</span>`;
   $('tE').innerHTML = face('p_hand', '조사');
-  $('tRun').innerHTML = face('p_door_open', '달리기');
+  $('tRun').innerHTML = face('p_run.svg', '달리기');
   $('tF').innerHTML = face('p_flashlight', '손전등');
   bag.innerHTML = face('p_bag', '가방');
   let lastMode = '';
@@ -107,7 +107,7 @@
     lastMode = m;
     document.body.classList.toggle('t-runner', m === 'runner');
     $('tE').querySelector('span').textContent = m === 'runner' ? '점프' : '조사';
-    $('tE').querySelector('img').src = m === 'runner' ? 'img/ui/p_arrow_next.webp' : 'img/ui/p_hand.webp';
+    $('tE').querySelector('img').src = m === 'runner' ? 'img/ui/p_jump.svg' : 'img/ui/p_hand.webp';
   }, 150);
   // 달리기 버튼 상태 표시
   $('tRun').addEventListener('pointerdown', () => setTimeout(() => $('tRun').classList.toggle('on', !!T.run), 0));

@@ -144,14 +144,14 @@ const HORROR = (() => {
     if (pre === 'p_') {
       const danger = (typeof dangerNear === 'function' && dangerNear()) || S.chaseLevel > .3;
       const rate = danger ? 7.5 : 2.2, amp = danger ? .02 : .011;
-      if (still) { const b = Math.sin(S.t * rate); return { sx: 1 - b * amp * .5, sy: 1 + b * amp, rot: 0, dx: danger ? rnd(-.25, .25) : 0 }; }
+      if (still) { const b = Math.sin(S.t * rate); return { sx: 1 - b * amp * .5, sy: 1 + b * amp, rot: 0, dx: 0 }; }
       const lean = P.run ? (dir === 'left' ? -.07 : dir === 'right' ? .07 : 0) : 0;
       const s = Math.sin(bob * 2) * (P.run ? .02 : .012);
       return { sx: 1 + s * .5, sy: 1 - s, rot: lean * .6 + Math.sin(bob) * (P.run ? .012 : .006), dx: 0 };
     }
     if (pre === 'm_') {
       const hunt = ['chase', 'pursue', 'search'].includes(M.state);
-      return { sx: 1, sy: 1, rot: (H.twitch > 0 ? H.twitchR : 0) + (hunt ? Math.sin(S.t * 23) * .012 : 0), dx: hunt ? rnd(-.5, .5) : 0 };
+      return { sx: 1, sy: 1, rot: H.twitch > 0 ? H.twitchR : 0, dx: 0 };
     }
     return null;
   };
@@ -165,10 +165,12 @@ const HORROR = (() => {
   };
   H.torchK = function () {
     let k = 1;
-    if (M.on && M.floor === S.floor) { const d = dist(M.x, M.y, P.x, P.y); if (d < 280) { const p = (1 - d / 280) * .5; if (Math.random() < p) k = Math.random() < .5 ? .05 : .45; } }
+    // 그것이 가까우면 손전등이 가끔 '깜-빡' (매 프레임 무작위로 떨지 않게)
+    if (M.on && M.floor === S.floor) { const d = dist(M.x, M.y, P.x, P.y); if (d < 280) k = .25 + .75 * blink(H, (1 - d / 280) * 1.6); }
     if (H.ev && H.ev.k === 'glimpse' && H.ev.t > H.ev.dur - .12) k = .15;
     return k;
   };
+
 
   /* ---------------- 그리기: 월드 좌표 ---------------- */
   H.world = function () {
@@ -236,9 +238,9 @@ const HORROR = (() => {
     if (S.mode !== 'play' || S.paused) return;
     const W = cv.width, Hh = cv.height;
     const near = M.on && M.floor === S.floor ? clamp(1 - dist(M.x, M.y, P.x, P.y) / 260, 0, 1) : 0;
-    let tear = Math.max(S.chaseLevel * .5 * near + (S.chaseLevel > .5 ? .12 : 0), H.ev && H.ev.k === 'glimpse' && H.ev.t > H.ev.dur - .15 ? .9 : 0);
+    let tear = Math.max(S.chaseLevel > .5 && near > .55 ? (near - .55) * 1.2 : 0, H.ev && H.ev.k === 'glimpse' && H.ev.t > H.ev.dur - .15 ? .9 : 0);
     if (calm()) tear *= .3;
-    if (Math.random() < tear * .35) {
+    if (Math.random() < tear * .12) {
       for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) {
         const y = Math.random() * Hh, h = rnd(4, 26) * DPR, dx = rnd(-22, 22) * DPR * (.4 + tear);
         ctx.drawImage(cv, 0, y, W, h, dx, y, W, h);
