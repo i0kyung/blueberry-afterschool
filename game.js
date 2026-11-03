@@ -227,8 +227,9 @@ const A = {
     for (const k of ['orgel', 'piano', 'drone', 'hum', 'chase', 'heart', 'sfx']) { const g = C.createGain(); g.gain.value = 0; g.connect(this.master); this.bus[k] = g; }
     this.bus.sfx.gain.value = 1;
     // 앰비언트 드론
-    const o = C.createOscillator(); o.type = 'sine'; o.frequency.value = 46; const og = C.createGain(); og.gain.value = .35; o.connect(og).connect(this.bus.drone); o.start();
-    const n = C.createBufferSource(); n.buffer = this.noise; n.loop = true; const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220; const ng = C.createGain(); ng.gain.value = .5;
+    const o = C.createOscillator(); o.type = 'sine'; o.frequency.value = 55; const og = C.createGain(); og.gain.value = .22; o.connect(og).connect(this.bus.drone); o.start();
+    const o2 = C.createOscillator(); o2.type = 'sine'; o2.frequency.value = 110.6; const og2 = C.createGain(); og2.gain.value = .07; o2.connect(og2).connect(this.bus.drone); o2.start();
+    const n = C.createBufferSource(); n.buffer = this.noise; n.loop = true; const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160; const ng = C.createGain(); ng.gain.value = .08;
     n.connect(lp).connect(ng).connect(this.bus.drone); n.start();
     // 형광등 험
     // (지지직거리지 않게: 사인 120Hz + 살짝 섞은 배음, 0.2Hz로 아주 느리게 숨쉬듯)
@@ -266,7 +267,7 @@ const A = {
   // 효과음
   step(vol, pan) { this.noiseHit(vol * .5, 380, 160, .07, pan, 'lowpass'); },
   heel(v, pan) {   // 작은 구두 굽 소리: 딸깍(고음) + 톡(저음)
-    this.noiseHit(v * 1.1, 3800, 2200, .03, pan, 'bandpass'); this.noiseHit(v * .7, 900, 500, .05, pan, 'bandpass'); this.tone(1450, 'triangle', v * .09, .001, .045, pan);
+    this.tone(1900, 'triangle', v * .16, .001, .035, pan, null, null, 1100); this.tone(420, 'sine', v * .22, .002, .07, pan, null, null, 260); this.noiseHit(v * .25, 2600, 1800, .02, pan, 'bandpass');
   },
   click(vol, pan) { this.noiseHit(vol * .9, 3200, 1800, .035, pan, 'bandpass'); this.tone(1800, 'square', vol * .04, .001, .02, pan); },
   rattle() { for (let i = 0; i < 4; i++) { const w = this.t() + i * .09 + rnd(0, .02); this.noiseHit(.5, 2400, 900, .06, 0, 'bandpass', w); this.tone(320, 'square', .05, .001, .04, 0, null, w); } },
@@ -500,6 +501,12 @@ function drawBag() {
     g.fillStyle = 'rgba(0,0,0,.55)'; const w = g.measureText(n).width + 18; g.fillRect(x - w / 2, y - 16, w, 32);
     g.fillStyle = '#f0eaff'; g.fillText(n, x, y);
   }
+  // 가 본 방의 숨을 수 있는 곳
+  for (const h of HIDES) {
+    if (h.f !== bagF || (h.req && !S.flags[h.req]) || !S.seen[bagF + ':' + roomName(bagF, h.x, h.y)]) continue;
+    g.fillStyle = 'rgba(170,130,255,.9)'; g.strokeStyle = '#efe6ff'; g.lineWidth = 3; g.beginPath(); g.arc(h.x, h.y - 6, 11, 0, 7); g.fill(); g.stroke();
+    if (HIDE_ICON.complete && HIDE_ICON.naturalWidth) g.drawImage(HIDE_ICON, h.x - 11, h.y - 17, 22, 22);
+  }
   if (bagF === S.floor) {
     g.fillStyle = '#ff7ac8'; g.strokeStyle = '#fff'; g.lineWidth = 4;
     g.beginPath(); g.arc(P.x, P.y - 10, 14, 0, 7); g.fill(); g.stroke();
@@ -527,7 +534,8 @@ function currentGoal() {
   if (!f.bc2) return '전원이 들어왔으니 방송실에 다시 가 보자.';
   if (fl_ === 1 && !f.f2) return hasItem('stairKey1') ? '2층 도서관 창가…… 서쪽 계단 철문을 열자.' : '계단 철문 열쇠…… 방송실 책상 서랍.';
   if (!f.signalTry) return '도서관 창가에서 신호가 잡힌다고 했어.';
-  if (!f.archive) return f.book3 ? '행정 기록이라면…… 2층 가운데 자료실?' : '도서관을 좀 더 둘러볼까.';
+  if (!f.book3) return '도서관 책장 맨 아래 칸…… 거꾸로 꽂힌 책이 있었어.';
+  if (!f.archive) return '행정 기록이라면…… 2층 가운데 자료실 서류함.';
   if (!hasItem('ironKey')) return '계단 철문 열쇠는 2층 청소도구실 열쇠함.';
   if (!f.f3) return '서쪽 계단 철문을 열고 3층으로.';
   if (!f.musicKey) return '음악실 열쇠는 미술 준비실에 있다고 했지.';
@@ -627,6 +635,19 @@ const HIDES = [
 ];
 
 const I = []; // 상호작용
+/* 이미 조사한 것은 반짝임을 지운다.
+   · 단순한 볼거리(칠판·세면대 등)는 한 번 보면 끝.
+   · 잠긴 문·열쇠함·전화처럼 나중에 달라질 수 있는 것은, 새 단서(메모·소지품)가 생기면 다시 반짝인다. */
+const MAYCHANGE = /문|열쇠|함|서랍|전화|컴퓨터|PC|콘솔|배전반|셔터|계단|피아노|박스|선반|창가|책|올라가기|내려가기|콘센트/;
+const progSig = () => S.items.length + '|' + S.memos.length;
+const ikey = o => o.f + ':' + o.label + ':' + o.x + ':' + o.y;
+// 조사가 끝난 뒤의 단서 상태를 기록 (조사하면서 얻은 메모 때문에 바로 다시 반짝이지 않게)
+function markChecked(o) { const m = S.flags.chk || (S.flags.chk = {}); const k = ikey(o); m[k] = 'wait'; const done = () => { if (S.busy) return setTimeout(done, 200); if (m[k] === 'wait') m[k] = progSig(); }; setTimeout(done, 50); }
+function isChecked(o) {
+  const m = S.flags.chk; if (!m) return false; const v = m[ikey(o)]; if (v == null) return false;
+  return v === 'wait' || (MAYCHANGE.test(o.label) ? v === progSig() : true);
+}
+const HIDE_ICON = new Image(); HIDE_ICON.src = 'img/ui/p_locker_eyes.webp';
 const add = o => I.push(Object.assign({ r: 42 }, o));
 
 /* =========================================================
@@ -641,6 +662,8 @@ const PATROL = {
 function mSpawn(f, x, y, state) {
   Object.assign(M, { on: true, floor: f, x, y, state: state || 'patrol', path: null, stateT: 0, searchQ: [], lostT: 0, target: null, checking: null, offT: 0, seenT: 0, speed: 50, pause: 1, alpha: null, forceSafe: M.forceSafe });
 }
+function farPoint(f) { const pts = PATROL[f].slice().sort((a, b) => dist(b[0], b[1], P.x, P.y) - dist(a[0], a[1], P.x, P.y)); return pts[(Math.random() * Math.min(3, pts.length)) | 0]; }
+function mLeave(back) { const p = farPoint(M.floor); setState('leave'); M.alpha = 1; M.leaveCb = () => { S.spawnAt = S.t + back; }; mSetTarget(p[0], p[1]); }
 function mOff() { M.on = false; M.state = 'off'; M.checking = null; }
 function setState(st, extra) { M.state = st; M.stateT = 0; M.path = null; Object.assign(M, extra || {}); }
 function mSetTarget(x, y) { M.target = [x, y]; M.path = findPath(M.floor, M.x, M.y, x, y); M.pathT = 0; }
@@ -694,11 +717,15 @@ function mUpdate(dt) {
     }
     case 'idle': case 'watch': break;
     case 'patrol': {
-      if (sees) { setState('alert'); A.giggle(.35, panOf(M.x)); break; }
+      if (sees) { M.patT = 0; setState('alert'); A.giggle(.35, panOf(M.x)); break; }
+      // 오래 못 찾으면 잠시 다른 층으로 간 것처럼 사라진다 — 탐색할 틈
+      M.patT = (M.patT || 0) + dt;
+      if (M.patT > 55 && (M.floor === 2 || M.floor === 3) && !S.flags.finale && !M.forceSafe && !onScreen(M.x, M.y, 40)) { M.patT = 0; mOff(); S.spawnAt = S.t + rnd(18, 30); break; }
       spd = 48;
       if (!M.path || !M.path.length) {
         if (M.stateT > M.pause) {
-          const pts = PATROL[M.floor]; const p = pts[(Math.random() * pts.length) | 0];
+          const all = PATROL[M.floor], far = all.filter(q => dist(q[0], q[1], P.x, P.y) > 300);
+          const pts = far.length && Math.random() < .7 ? far : all; const p = pts[(Math.random() * pts.length) | 0];
           mSetTarget(p[0] + rnd(-20, 20), p[1] + rnd(-10, 10)); M.pause = rnd(1, 3.2); M.stateT = 0;
         }
       } else if (mStep(dt, spd)) { M.stateT = 0; M.dir = ['left', 'right', 'up', 'down'][(Math.random() * 4) | 0]; }
@@ -750,7 +777,11 @@ function mUpdate(dt) {
       } else if (M.searchQ.length) {
         M.checking = M.searchQ.shift(); mSetTarget(M.checking.x, M.checking.y + 18); M.checkT = 0;
       } else if (!M.path || !M.path.length || mStep(dt, spd)) {
-        if (M.stateT > 4) { setState('patrol'); M.pause = 2; if (M.onSearchEnd) { const cb = M.onSearchEnd; M.onSearchEnd = null; cb(); } }
+        if (M.stateT > 4) {
+          if (M.onSearchEnd) { setState('patrol'); M.pause = 2; const cb = M.onSearchEnd; M.onSearchEnd = null; cb(); }
+          else if ((M.floor === 2 || M.floor === 3) && !S.flags.finale && !M.forceSafe) mLeave(rnd(25, 40));
+          else { setState('patrol'); M.pause = 2; }
+        }
       }
       break;
     }
@@ -804,7 +835,7 @@ function resolveCheck(spot) {
   if (M.forceSafe) return;
   let chance;
   if (P.holding && P.breath > .02) chance = M.cfg.open * (1 - spot.s) * (M.sawHide === spot ? 2.4 : S.hideFav && S.hideFav.h === spot && S.hideFav.n >= 2 ? 1.9 : 1.4);
-  else chance = .85;
+  else chance = M.sawHide === spot ? .85 : .4;
   if (Math.random() < chance) { A.creak(); caught(); } else { A.creak(); }
 }
 function faceTo(x, y, tx, ty) { const dx = tx - x, dy = ty - y; return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'); }
@@ -939,8 +970,8 @@ function directorUpdate(dt) {
   // 지연 스폰
   if (S.spawnAt && S.t > S.spawnAt && !M.on && !S.mFollow && !S.busy) {
     S.spawnAt = 0;
-    if (f === 2 && !fl.f2done) { fl.f2spawned = true; mSpawn(2, 1300, 460, 'patrol'); M.pause = 1; }
-    if (f === 3 && !fl.pianoDone) { mSpawn(3, 1180, 460, 'patrol'); M.pause = 1; }
+    if (f === 2 && !fl.f2done) { fl.f2spawned = true; const p = farPoint(2); mSpawn(2, p[0], p[1], 'patrol'); M.pause = 1; M.patT = 0; }
+    if (f === 3 && !fl.pianoDone) { const p = farPoint(3); mSpawn(3, p[0], p[1], 'patrol'); M.pause = 1; M.patT = 0; }
   }
   // 오르골 볼륨 = 괴물 거리
   let og = 0;
@@ -1047,7 +1078,7 @@ function render(dt) {
   }
   // 상호작용 반짝임
   if (!P.hidden) for (const o of I) {
-    if (o.f !== S.floor || (o.when && !o.when()) || o.noGlint) continue;
+    if (o.f !== S.floor || (o.when && !o.when()) || o.noGlint || isChecked(o)) continue;
     const d = dist(o.x, o.y, P.x, P.y); if (d > 210) continue;
     const pulse = .5 + .5 * Math.sin(S.t * 3 + o.x), a = (1 - d / 210);
     ctx.fillStyle = `rgba(215,232,255,${a * (.55 + .35 * pulse)})`; ctx.beginPath(); ctx.arc(o.x, o.y, 3.2, 0, 7); ctx.fill();
@@ -1196,12 +1227,27 @@ function drawGlintsTop() {
   if (P.hidden || S.lock) return;
   ctx.save(); ctx.globalCompositeOperation = 'lighter';
   for (const o of I) {
-    if (o.f !== S.floor || (o.when && !o.when()) || o.noGlint) continue;
+    if (o.f !== S.floor || (o.when && !o.when()) || o.noGlint || isChecked(o)) continue;
     const d = dist(o.x, o.y, P.x, P.y); if (d > 210) continue;
     const [sx, sy] = w2s(o.x, o.y); const pulse = .5 + .5 * Math.sin(S.t * 3 + o.x), a = (1 - d / 210) * .5;
     ctx.fillStyle = `rgba(150,190,255,${a * (.4 + .6 * pulse)})`; ctx.beginPath(); ctx.arc(sx * DPR, sy * DPR, 3 * DPR, 0, 7); ctx.fill();
   }
   ctx.restore();
+  // 숨을 수 있는 곳: 가까이 가면 보라색 '눈' 표식 (그것이 가까우면 더 또렷하게)
+  if (!HIDE_ICON.complete || !HIDE_ICON.naturalWidth) return;
+  const danger = M.on && M.floor === S.floor && dist(M.x, M.y, P.x, P.y) < 420;
+  const reach = danger ? 320 : 240;
+  for (const h of HIDES) {
+    if (h.f !== S.floor || (h.req && !S.flags[h.req])) continue;
+    const d = dist(h.x, h.y, P.x, P.y); if (d > reach) continue;
+    const a = Math.min(1, (1 - d / reach) * 1.6) * (danger ? 1 : .75), near = d < 30;
+    const [sx, sy] = w2s(h.x, h.y - 30); const sz = (near ? 22 : 16) * Math.min(1.6, cam.z) * DPR, bob = Math.sin(S.t * 2.4 + h.x) * 2 * DPR;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = near ? 'rgba(160,120,255,.55)' : 'rgba(20,14,40,.6)'; ctx.beginPath(); ctx.arc(sx * DPR, sy * DPR + bob, sz * .68, 0, 7); ctx.fill();
+    ctx.strokeStyle = near ? '#e6dcff' : 'rgba(190,160,255,.7)'; ctx.lineWidth = 1.5 * DPR; ctx.stroke();
+    ctx.drawImage(HIDE_ICON, sx * DPR - sz / 2, sy * DPR - sz / 2 + bob, sz, sz);
+    ctx.restore();
+  }
 }
 function drawStairGate(x, kind) {
   const w = kind === 'block' && x === 1262 ? 64 : 84, y = 190;
@@ -1626,7 +1672,7 @@ async function archiveEvent() {
   memo('계단 철문 열쇠 → 2층 청소도구실'); memo('음악실 열쇠 → 3층 미술 준비실');
 }
 async function janitorEvent() {
-  if (!fl().archive) { await narr('작은 열쇠함. 태그가 빛바래서 뭐가 뭔지 모르겠다.'); return; }
+  if (!fl().archive) { await narr('작은 열쇠함. 태그가 빛바래서 뭐가 뭔지 모르겠다.'); await say('어느 게 무슨 열쇠인지 적어 둔 기록이 있을 텐데…… 자료실?'); memo('열쇠함 태그가 안 보임 → 2층 자료실 기록'); return; }
   await narr('열쇠함 맨 아래 칸 — 「계단 철문」.');
   addItem('ironKey', '계단 철문 열쇠');
   await wait(400);
@@ -1889,7 +1935,7 @@ function frame(dt) {
         if (n) { pr.classList.remove('hidden'); $('pText').textContent = n.label; const alt = !!(n.hide || n.hideExit); pr.classList.toggle('alt', alt);
           const src = alt ? 'img/ui/p_locker_eyes.webp' : 'img/ui/c_key_e.webp'; if (!$('pKey').src.endsWith(src)) $('pKey').src = src; }
         else pr.classList.add('hidden');
-        if (ePressed) { ePressed = false; if (n) n.act(); }
+        if (ePressed) { ePressed = false; if (n) { if (!n.hide && !n.hideExit) markChecked(n); n.act(); } }
         // 숨 참기 UI
         const showB = P.hidden && breathPrompt() && !M.forceSafe;
         const bEl = $('breath');

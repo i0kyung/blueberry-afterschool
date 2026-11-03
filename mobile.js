@@ -75,6 +75,7 @@
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => el.addEventListener(t, () => el.classList.remove('down')));
   }
 
+  $('bText').textContent = '오른쪽 큰 버튼을 길게 눌러 숨 참기';
   /* ---- 키보드 안내 대신 터치 안내 ---- */
   const _hint = hint;
   hint = function (html, ms) {
