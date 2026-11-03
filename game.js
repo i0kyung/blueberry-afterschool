@@ -244,7 +244,11 @@ const A = {
     this.lastPulse = 0; this.lastHeart = 0;
   },
   t() { return this.ctx ? this.ctx.currentTime : 0; },
-  setBus(k, v, tc) { if (!this.ctx) return; this.bus[k].gain.setTargetAtTime(v, this.t(), tc || .3); },
+  setBus(k, v, tc) {
+    if (!this.ctx || !isFinite(v)) return; this.last = this.last || {};
+    if (this.last[k] != null && Math.abs(this.last[k] - v) < .004) return; this.last[k] = v;
+    this.bus[k].gain.setTargetAtTime(v, this.t(), tc || .3);
+  },
   env(node, t, a, peak, dec) { node.gain.setValueAtTime(0, t); node.gain.linearRampToValueAtTime(peak, t + a); node.gain.exponentialRampToValueAtTime(.0001, t + a + dec); },
   pan(v) { const p = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : this.ctx.createGain(); if (p.pan) p.pan.value = clamp(v, -1, 1); return p; },
   noiseHit(vol, f1, f2, dur, pan, type, when) {
@@ -261,6 +265,9 @@ const A = {
   pianoN(midi, when, bus, vol) { const f = 440 * Math.pow(2, (midi - 69) / 12); this.tone(f, 'triangle', .3 * vol, .004, 2.2, 0, bus, when); this.tone(f * 2, 'sine', .08 * vol, .003, 1.1, 0, bus, when); this.tone(f * .5, 'sine', .05 * vol, .01, 1.5, 0, bus, when); },
   // 효과음
   step(vol, pan) { this.noiseHit(vol * .5, 380, 160, .07, pan, 'lowpass'); },
+  heel(v, pan) {   // 작은 구두 굽 소리: 딸깍(고음) + 톡(저음)
+    this.noiseHit(v * 1.1, 3800, 2200, .03, pan, 'bandpass'); this.noiseHit(v * .7, 900, 500, .05, pan, 'bandpass'); this.tone(1450, 'triangle', v * .09, .001, .045, pan);
+  },
   click(vol, pan) { this.noiseHit(vol * .9, 3200, 1800, .035, pan, 'bandpass'); this.tone(1800, 'square', vol * .04, .001, .02, pan); },
   rattle() { for (let i = 0; i < 4; i++) { const w = this.t() + i * .09 + rnd(0, .02); this.noiseHit(.5, 2400, 900, .06, 0, 'bandpass', w); this.tone(320, 'square', .05, .001, .04, 0, null, w); } },
   knock() { for (let i = 0; i < 3; i++) this.noiseHit(.9, 300, 120, .1, 0, 'lowpass', this.t() + i * .22); },
@@ -641,7 +648,9 @@ function mStep(dt, spd) {
   if (!M.path || !M.path.length) return true;
   const [tx, ty] = M.path[0]; const d = dist(M.x, M.y, tx, ty);
   const s = spd * dt;
-  if (d <= s) { M.x = tx; M.y = ty; M.path.shift(); M.mv += d; return !M.path.length; }
+  if (!isFinite(tx) || !isFinite(ty)) { M.path.shift(); return !M.path.length; }
+  if (s <= 0) return false;
+  if (d <= s || d < 1e-6) { M.x = tx; M.y = ty; M.path.shift(); M.mv += d; return !M.path.length; }
   const dx = (tx - M.x) / d, dy = (ty - M.y) / d; M.x += dx * s; M.y += dy * s; M.mv += s;
   M.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
   return false;
@@ -771,7 +780,7 @@ function mUpdate(dt) {
     M.stepT -= dt * (spd / 50);
     if (M.stepT <= 0) {
       M.stepT = .48; const d = dist(M.x, M.y, P.x, P.y);
-      const v = clamp(1 - d / 650, 0, 1); if (v > 0) A.click(v * .75, panOf(M.x));
+      const v = Math.pow(clamp(1 - d / 760, 0, 1), .8); if (v > 0) A.heel(v, panOf(M.x));
       S.footprints.push({ x: M.x + rnd(-3, 3), y: M.y, t: S.t, d: M.dir });
       if (S.footprints.length > 140) S.footprints.shift();
     }
@@ -939,7 +948,7 @@ function directorUpdate(dt) {
     const d = dist(M.x, M.y, P.x, P.y);
     if (d > 130) og = clamp(1 - (d - 130) / 900, .04, .55); else og = 0;   // 가까우면 오히려 끊김
     if (M.state === 'chase' || M.state === 'pursue') og = Math.max(og, .35);
-    if (d < 130 && Math.random() < dt * .8) A.breath(.5, panOf(M.x));
+    if (d < 170 && Math.random() < dt * 1.1) A.breath(.9, panOf(M.x));
     if (!ORGEL.on && !S.orgelMute) ORGEL.start();
   } else if (S.orgelAmb) { og = S.orgelAmb; if (!ORGEL.on) ORGEL.start(); }
   else if (!S.orgelForce) { if (ORGEL.on) ORGEL.stop(); }
@@ -973,11 +982,15 @@ const cv = $('c'), ctx = cv.getContext('2d');
 let VW = 0, VH = 0, DPR = 1;
 const cam = { x: 330, y: 236, z: 2, ov: null };
 function resize() {
-  DPR = Math.min(window.devicePixelRatio || 1, 2); VW = innerWidth; VH = innerHeight;
+  DPR = Math.min(window.devicePixelRatio || 1, QUAL.cap); VW = innerWidth; VH = innerHeight;
   cv.width = VW * DPR; cv.height = VH * DPR;
   dark.width = cv.width; dark.height = cv.height;
+  darkLo.width = Math.ceil(cv.width * DS); darkLo.height = Math.ceil(cv.height * DS);
 }
 const dark = document.createElement('canvas'); const dctx = dark.getContext('2d');
+// 어둠은 부드러운 그라데이션뿐이라 절반 해상도로 그려서 늘려도 티가 안 난다 (휴대폰에서 크게 빨라짐)
+const DS = .5, darkLo = document.createElement('canvas'), dlctx = darkLo.getContext('2d');
+const QUAL = { cap: matchMedia('(pointer:coarse)').matches ? 1.25 : 1.5, lvl: 0, acc: 0, n: 0 };
 const grain = document.createElement('canvas'); grain.width = grain.height = 256;
 (() => { const g = grain.getContext('2d'), d = g.createImageData(256, 256); for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } g.putImageData(d, 0, 0); })();
 window.addEventListener('resize', resize);
@@ -1062,12 +1075,12 @@ function render(dt) {
 
   // ---- 어둠 + 빛 ----
   drawDarkness();
-  ctx.drawImage(dark, 0, 0);
+  ctx.imageSmoothingQuality = 'low'; ctx.drawImage(darkLo, 0, 0, cv.width, cv.height); ctx.imageSmoothingQuality = 'high';
   if (window.HORROR) HORROR.screen(dt);
 
   // 추가광: 비상구, 방송 ON AIR, 붉은 추격
   ctx.globalCompositeOperation = 'lighter';
-  const glow = (x, y, r, col, a) => { const [gx, gy] = w2s(x, y); const g = ctx.createRadialGradient(gx * DPR, gy * DPR, 0, gx * DPR, gy * DPR, r * cam.z * DPR); g.addColorStop(0, col.replace('A', a)); g.addColorStop(1, col.replace('A', 0)); ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height); };
+  const glow = (x, y, r, col, a) => { const [gx, gy] = w2s(x, y); const g = ctx.createRadialGradient(gx * DPR, gy * DPR, 0, gx * DPR, gy * DPR, r * cam.z * DPR); g.addColorStop(0, col.replace('A', a)); g.addColorStop(1, col.replace('A', 0)); ctx.fillStyle = g; const rr = r * cam.z * DPR; ctx.fillRect(gx * DPR - rr, gy * DPR - rr, rr * 2, rr * 2); };
   glow(102, 336, 22, 'rgba(60,255,140,A)', .16); glow(1350, 336, 22, 'rgba(60,255,140,A)', .16);
   if (S.floor === 1 && S.flags.power) glow(720, 60, 40, 'rgba(255,40,60,A)', .25 + .1 * Math.sin(S.t * 4));
   if (S.chaseLevel > .02) { ctx.fillStyle = `rgba(160,0,20,${S.chaseLevel * (.08 + .06 * Math.sin(S.t * 9))})`; ctx.fillRect(0, 0, cv.width, cv.height); }
@@ -1080,9 +1093,9 @@ function render(dt) {
   ctx.fillStyle = vg; ctx.fillRect(0, 0, cv.width, cv.height);
   if (S.chaseLevel > .05) { const rg = ctx.createRadialGradient(cv.width / 2, cv.height / 2, Math.min(cv.width, cv.height) * .35, cv.width / 2, cv.height / 2, Math.max(cv.width, cv.height) * .7); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(1, `rgba(200,10,30,${S.chaseLevel * .35})`); ctx.fillStyle = rg; ctx.fillRect(0, 0, cv.width, cv.height); }
   // 필름 그레인
-  ctx.globalAlpha = typeof SET === 'undefined' || SET.grain ? .035 : 0; ctx.globalCompositeOperation = 'overlay';
+  ctx.globalAlpha = (typeof SET === 'undefined' || SET.grain) && !QUAL.lite ? .035 : 0; ctx.globalCompositeOperation = 'overlay';
   if (!render.gT || S.t - render.gT > 1 / 12 || S.t < render.gT) { render.gT = S.t; render.gO = [rnd(0, 256), rnd(0, 256)]; }
-  const pat = ctx.createPattern(grain, 'repeat'); ctx.translate(render.gO[0], render.gO[1]); ctx.fillStyle = pat; ctx.fillRect(-256, -256, cv.width + 512, cv.height + 512);
+  const pat = render.pat || (render.pat = ctx.createPattern(grain, 'repeat')); ctx.translate(render.gO[0], render.gO[1]); ctx.fillStyle = pat; ctx.fillRect(-256, -256, cv.width + 512, cv.height + 512);
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   drawGlintsTop();
   // 숨기 틈 시야
@@ -1130,8 +1143,8 @@ function fillPoly(d, ox, oy, pts, r, a, mid, fan) {
 }
 
 function drawDarkness() {
-  const d = dctx, W = dark.width, H = dark.height, z = cam.z * DPR;
-  d.setTransform(1, 0, 0, 1, 0, 0); d.globalCompositeOperation = 'source-over';
+  const d = dlctx, W = darkLo.width / DS, H = darkLo.height / DS, z = cam.z * DPR;
+  d.setTransform(DS, 0, 0, DS, 0, 0); d.globalCompositeOperation = 'source-over';
   const base = S.floor === 4 ? .94 : .92;
   d.fillStyle = `rgba(3,5,14,${base})`; d.fillRect(0, 0, W, H);
   d.globalCompositeOperation = 'destination-out';
@@ -1841,8 +1854,23 @@ function triggers() {
    메인 루프
    ========================================================= */
 let lastT = performance.now();
-function loop(now) {
-  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+let loopErr = 0;
+function loop() {
+  const now = performance.now();
+  const dt = clamp((now - lastT) / 1000, 0, .05); lastT = now;
+  try { frame(dt); } catch (e) { if (loopErr++ < 3) console.error(e); }
+  if (!loop.manual) requestAnimationFrame(loop);
+}
+function adaptQuality(dt) {
+  if (S.mode !== 'play' && S.mode !== 'runner') return;
+  QUAL.acc += dt; QUAL.n++;
+  if (QUAL.acc < 2) return;
+  const fps = QUAL.n / QUAL.acc; QUAL.acc = 0; QUAL.n = 0;
+  if (fps < 40 && QUAL.cap > 1) { QUAL.cap = Math.max(1, QUAL.cap - .25); resize(); }
+  else if (fps < 28 && QUAL.cap <= 1 && !QUAL.lite) { QUAL.lite = true; document.body.classList.add('lite'); }
+}
+function frame(dt) {
+  adaptQuality(dt);
   if (S.mode === 'runner') {
     if (!S.paused) { S.t += dt; tickTimers(); runUpdate(dt); updatePhone(); }
     runRender(dt);
@@ -1876,10 +1904,9 @@ function loop(now) {
     }
     render(dt);
   }
-  if (!loop.manual) requestAnimationFrame(loop);
 }
 // 보조 틱: requestAnimationFrame이 멈춘 환경(일부 임베드 뷰 등)에서도 진행되도록
-setInterval(() => { if (performance.now() - lastT > 60) { loop.manual = true; loop(performance.now()); loop.manual = false; } }, 16);
+setInterval(() => { if (!document.hidden && performance.now() - lastT > 500) { loop.manual = true; loop(); loop.manual = false; } }, 250);
 
 /* =========================================================
    타이틀 / 캐릭터 선택

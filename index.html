@@ -573,6 +573,11 @@ body.touch #hint{top:56px}
 body.touch #say{bottom:calc(10px + env(safe-area-inset-bottom));max-width:min(560px,52vw)}
 body.t-runner #dpad,body.t-runner #tBag{display:none!important}
 body.touch.t-runner #tE i{width:100px!important;height:100px!important}
+
+/* 성능: 움직이는 게임 화면 위의 반투명 흐림(backdrop-filter)은 매 프레임 다시 계산돼 무겁다 → 게임 중 HUD는 흐림 없이 */
+.chip,#prompt,#goal,#phone,#hint,#breath,#tbtns button,#bagBtn,#menuBtn{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+.chip{background:rgba(10,14,32,.82)}#prompt{background:rgba(10,14,32,.86)}#hint{background:rgba(10,14,32,.86)}
+body.lite #dpad{filter:none}
 </style>
 </head>
 <body>

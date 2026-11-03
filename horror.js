@@ -17,18 +17,15 @@ const HORROR = (() => {
 
   /* ---------------- 오디오: 복도 울림 + 숨으면 먹먹하게 ---------------- */
   H.audio = function (A) {
-    const C = A.ctx; if (!C || A.rev) return;
-    // 2.4초짜리 복도 잔향(감쇠 노이즈로 만든 임펄스)
-    const len = C.sampleRate * 2.4, ir = C.createBuffer(2, len, C.sampleRate);
-    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2) * (i < 900 ? i / 900 : 1); }
-    const rev = C.createConvolver(); rev.buffer = ir;
-    const wet = C.createGain(); wet.gain.value = .32;
-    rev.connect(wet).connect(A.master);
-    for (const k of ['sfx', 'orgel', 'piano']) A.bus[k].connect(rev);
-    // 마스터 뒤에 저역 필터: 숨으면 바깥 소리가 벽 너머처럼 들린다
-    const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 20000; lp.Q.value = .4;
-    A.master.disconnect(); A.master.connect(lp).connect(C.destination);
-    A.rev = rev; A.lp = lp;
+    const C = A.ctx; if (!C || A.lim) return;
+    // 잔향(컨볼버)은 휴대폰에서 소리가 끊기고 렉의 원인이라 뺐다.
+    // 마스터 → 저역 컷(휴대폰 스피커가 떨지 않게) → 리미터(여러 소리가 겹쳐 찢어지지 않게) → 출력
+    const hp = C.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = matchMedia('(pointer:coarse)').matches ? 90 : 35; hp.Q.value = .5;
+    const lim = C.createDynamicsCompressor(); lim.threshold.value = -12; lim.knee.value = 8; lim.ratio.value = 10; lim.attack.value = .003; lim.release.value = .18;
+    A.master.disconnect(); A.master.connect(hp).connect(lim).connect(C.destination);
+    // 숨으면 '음악·분위기'만 벽 너머처럼 먹먹하게 — 그것의 발소리·숨소리(효과음)는 또렷하게 남긴다
+    if (A.cat) { const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 20000; A.cat.music.disconnect(); A.cat.music.connect(lp).connect(A.master); A.lp = lp; }
+    A.lim = lim;
   };
 
   /* ---------------- 효과음 (합성) ---------------- */
@@ -98,7 +95,7 @@ const HORROR = (() => {
   H.update = function (dt) {
     const fl = S.flags;
     // 숨으면 먹먹하게
-    if (A.lp) A.lp.frequency.setTargetAtTime(P.hidden ? 1100 : 20000, A.t(), .15);
+    if (A.lp && H.muf !== !!P.hidden) { H.muf = !!P.hidden; A.lp.frequency.setTargetAtTime(P.hidden ? 1400 : 20000, A.t(), .15); }
     // 손전등 흔들림(걸음)
     // 손전등은 걸음마다 흔들지 않는다 (화면 전체가 흔들려 보여서). 서 있을 때만 아주 느리게 미세하게.
     H.sway = !P.moving && (typeof SET === 'undefined' || SET.shake) ? Math.sin(S.t * .8) * .006 : 0;
@@ -197,7 +194,7 @@ const HORROR = (() => {
     const z = cam.z * DPR;
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     // 손전등 빛 속 먼지
-    if (S.torch && !P.hidden && S.mode === 'play') {
+    if (S.torch && !P.hidden && S.mode === 'play' && !(typeof QUAL !== 'undefined' && QUAL.lite)) {
       const ox = P.x, oy = P.y - 12, ang = P.ang + H.sway;
       for (const p of H.dust) {
         p.ph += dt * .6; const d = 40 + p.z * 230, a0 = ang + (p.x - .5) * .9;
@@ -239,7 +236,7 @@ const HORROR = (() => {
     const W = cv.width, Hh = cv.height;
     const near = M.on && M.floor === S.floor ? clamp(1 - dist(M.x, M.y, P.x, P.y) / 260, 0, 1) : 0;
     let tear = Math.max(S.chaseLevel > .5 && near > .55 ? (near - .55) * 1.2 : 0, H.ev && H.ev.k === 'glimpse' && H.ev.t > H.ev.dur - .15 ? .9 : 0);
-    if (calm()) tear *= .3;
+    if (calm() || (typeof QUAL !== 'undefined' && QUAL.lite)) tear = 0;
     if (Math.random() < tear * .12) {
       for (let i = 0; i < 2 + (Math.random() * 3 | 0); i++) {
         const y = Math.random() * Hh, h = rnd(4, 26) * DPR, dx = rnd(-22, 22) * DPR * (.4 + tear);
