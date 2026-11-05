@@ -578,6 +578,22 @@ body.touch.t-runner #tE i{width:100px!important;height:100px!important}
 .chip,#prompt,#goal,#phone,#hint,#breath,#tbtns button,#bagBtn,#menuBtn{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 .chip{background:rgba(10,14,32,.82)}#prompt{background:rgba(10,14,32,.86)}#hint{background:rgba(10,14,32,.86)}
 body.lite #dpad{filter:none}
+
+/* 잡혔을 때 영상 */
+#cvid{position:fixed;inset:0;z-index:40;background:#000;overflow:hidden}
+#cvid video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 45%}
+#cvid.hit video{animation:cvShake .16s steps(3) both;filter:contrast(1.35) saturate(1.3) brightness(1.25)}
+@keyframes cvShake{0%{transform:scale(1.08) translate(-2.5%,1.5%)}33%{transform:scale(1.1) translate(2%,-2%)}66%{transform:scale(1.06) translate(-1%,1%)}100%{transform:scale(1.03)}}
+#cvid .cflash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+#cvid.hit .cflash{animation:cvFlash .16s ease-out}
+@keyframes cvFlash{0%{opacity:.55}100%{opacity:0}}
+#cvid.hold video{transition:transform 2s ease-out,filter .9s;transform:scale(1.07)}
+#cvid.red video{filter:brightness(.45) saturate(1.4) sepia(.35) hue-rotate(-20deg)}
+#cvid .cred{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 45%,rgba(120,0,20,.15),rgba(90,0,14,.85));opacity:0;transition:opacity .5s;pointer-events:none}
+#cvid.red .cred{opacity:1}
+#cvid .ctxt{position:absolute;inset:0;display:grid;place-items:center;font:800 clamp(30px,7vw,72px) Pretendard;color:#ff2d4a;letter-spacing:.3em;opacity:0;text-shadow:0 0 26px rgba(255,0,40,.75);transition:opacity .25s}
+#cvid.red .ctxt{opacity:1;animation:txtj .07s steps(2) infinite}
+body.calm #cvid.red .ctxt{animation:none}
 </style>
 </head>
 <body>
@@ -634,6 +650,7 @@ body.lite #dpad{filter:none}
 <div id="fade"></div>
 <div id="jump" class="hidden"><img src="img/closeup.png" alt=""></div>
 <div id="scare" class="hidden"></div>
+<div id="cvid" class="hidden"><video src="video/caught_classroom.mp4" poster="video/caught_classroom_end.webp" preload="auto" playsinline webkit-playsinline disablepictureinpicture></video><div class="cflash"></div><div class="cred"></div><div class="ctxt"></div></div>
 <div id="dead" class="hidden"><div class="dbg"></div><div class="din"><p>잡혔다</p><button class="btn primary ico" id="bAgain"><img src="img/ui/p_arrow_back.webp" alt="">다시 하기</button></div></div>
 
 <!-- boot / loading -->

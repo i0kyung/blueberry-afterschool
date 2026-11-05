@@ -1288,12 +1288,48 @@ function checkpoint() {
   S.cp.resume = S.resumeFn || null;
 }
 let dying = false;
+/* 잡혔을 때 영상 (Kling) — 3초: 0~2초 정지·고개 꺾임 → 2.05초 돌진 → 클로즈업
+   처음 잡힐 땐 처음부터, 그다음부터는 1.3초 지점부터 (반복해서 죽을 때 지루하지 않게).
+   영상이 준비 안 됐거나 재생이 막히면 false → 기존 그림 연출로 */
+const CV_HIT = 2.05;
+let cvDeaths = 0;
+// 아이폰 사파리: 첫 터치 때 한 번 재생→정지해 두어야 나중에 소리와 함께 재생된다
+document.addEventListener('pointerdown', function cvUnlock() {
+  const v = document.querySelector('#cvid video'); if (!v) return;
+  document.removeEventListener('pointerdown', cvUnlock, true);
+  v.muted = true; const p = v.play(); if (p && p.then) p.then(() => { v.pause(); v.currentTime = 0; v.muted = false; }).catch(() => { }); else v.load();
+}, true);
+async function caughtVideo() {
+  const box = $('cvid'), v = box && box.querySelector('video');
+  if (!v || v.error || v.readyState < 2) return false;
+  const calm = typeof SET !== 'undefined' && SET.calm;
+  const vol = muted ? 0 : (typeof SET !== 'undefined' ? SET.master / 100 * SET.sfx / 100 : .9);
+  const T = ms => new Promise(r => setTimeout(r, ms));
+  const txt = box.querySelector('.ctxt'); txt.textContent = ['찾았다.', '여기 있었네.', '술래는 너야.'][(Math.random() * 3) | 0];
+  box.className = ''; v.currentTime = cvDeaths++ ? 1.3 : 0; v.volume = Math.min(1, vol); v.muted = vol === 0;
+  try { await v.play(); } catch (e) { try { v.muted = true; await v.play(); } catch (e2) { box.classList.add('hidden'); return false; } }
+  A.ring();
+  // 돌진 순간: 화면 흔들림 + 번쩍 + 낮은 쿵 (번쩍임 줄이기면 흔들림·번쩍 없이)
+  const hit = new Promise(res => { const f = () => { if (v.currentTime >= CV_HIT || v.ended) return res(); requestAnimationFrame(f); }; f(); setTimeout(res, 4000); });
+  let heartT = setInterval(() => A.heart(), 620);
+  await hit; clearInterval(heartT);
+  if (!calm) box.classList.add('hit');
+  A.noiseHit(1, 180, 50, .5, 0, 'lowpass'); A.scream();
+  await T(calm ? 60 : 160); box.classList.remove('hit');
+  await new Promise(res => { if (v.ended) return res(); v.onended = res; setTimeout(res, 2500); });
+  v.onended = null;
+  box.classList.add('hold'); A.giggle(.4, .2); await T(700);       // 마지막 얼굴에서 멈춘 채 붉게
+  box.classList.add('red'); A.heart(); await T(1300);
+  box.classList.add('hidden'); v.pause();
+  return true;
+}
 async function caught() {
   if (dying) return; dying = true;
   S.lock = true; S.busy = true;
   if (typeof RN !== 'undefined') RN.on = false;
   // 모든 소리를 끊는다 — 정적
   ['orgel', 'piano', 'chase', 'heart', 'hum', 'drone'].forEach(k => A.setBus(k, 0, .02)); ORGEL.stop(); PIANO.stop(); S.orgelForce = 0;
+  if (await caughtVideo()) { $('dead').classList.remove('hidden'); mOff(); S.paused = true; return; }
   const faces = ['img/scare_smile.jpg', 'img/scare_stare.jpg', 'img/scare_eyes.jpg'].sort(() => Math.random() - .5);
   const sc = $('scare'); sc.className = '';
   sc.innerHTML = `<img class="far" src="img/closeup.png" alt=""><img class="face f1" src="${faces[0]}" alt=""><img class="face rgbR" src="${faces[0]}" alt=""><img class="face rgbB" src="${faces[0]}" alt=""><img class="face f2" src="${faces[1]}" alt=""><div class="noise"></div><div class="txt">${['찾았다.', '여기 있었네.', '술래는 너야.'][(Math.random() * 3) | 0]}</div>`;

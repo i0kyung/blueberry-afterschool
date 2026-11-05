@@ -287,13 +287,13 @@ function renderAch() {
 const GALLERY = [
   ['keyart_classroom', '키 아트 · 교실', 0], ['keyart_candle', '키 아트 · 촛불', 0], ['keyart_dollroom', '키 아트 · 인형의 방', 1],
   ['keyart_highangle', '키 아트 · 내려다보는 시선', 1], ['enemy_doll', '그것 · 인형 소녀', 1], ['enemy_nurse', '??? · 유령 간호사', 2],
-  ['enemy_shadow', '??? · 그림자 소년', 2], ['enemy_ragged', '??? · 누더기 소년', 2],
+  ['enemy_shadow', '??? · 그림자 소년', 2], ['enemy_ragged', '??? · 누더기 소년', 2], ['caught_classroom', '찾았다', 'c'],
 ];
 function renderGallery() {
   const cleared = Object.keys(store.get('berry_cleared', {})).length > 0;
   $('galList').innerHTML = GALLERY.map(([f, t, lv]) => {
-    const open = lv === 0 || (lv >= 1 && cleared);
-    return `<button class="gi ${open ? '' : 'lock'}" data-f="${f}" ${open ? '' : 'disabled'}><img src="img/gallery/${f}_s.webp" alt="" loading="lazy"><span>${open ? t : lv === 2 ? '다음 챕터에서' : '클리어 후 열림'}</span></button>`;
+    const open = lv === 0 || (lv === 'c' ? !!GOT.caught : (lv >= 1 && cleared));
+    return `<button class="gi ${open ? '' : 'lock'}" data-f="${f}" ${open ? '' : 'disabled'}><img src="img/gallery/${f}_s.webp" alt="" loading="lazy"><span>${open ? t : lv === 2 ? '다음 챕터에서' : lv === 'c' ? '잡히면 열림' : '클리어 후 열림'}</span></button>`;
   }).join('');
   $('galList').querySelectorAll('.gi:not(.lock)').forEach(b => b.addEventListener('click', () => {
     const v = $('galView'); v.innerHTML = `<img src="img/gallery/${b.dataset.f}.webp" alt=""><p>${b.querySelector('span').textContent}</p>`; v.classList.remove('hidden'); UI.ok();
